@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FicheChef — Fiches techniques &amp; allergènes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F6F1E7;
+    --paper:#FFFCF6;
+    --ink:#1B1814;
+    --muted:#8A7F6A;
+    --line:#E1D5B8;
+    --copper:#BC5B2E;
+    --copper-ink:#7A3A1C;
+    --sage:#4F6F52;
+    --rust:#9E3A2E;
+    --rust-bg:#F6E4DF;
+    --sage-bg:#E7EEE3;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---- Rail header (signature element) ---- */
+  .rail{position:relative;background:var(--ink);color:var(--bg);padding:28px 24px 34px;overflow:hidden;}
+  .rail::after{
+    content:"";position:absolute;left:0;right:0;bottom:14px;height:2px;background:var(--copper);
+    box-shadow:0 0 0 4px var(--ink);
+  }
+  .rail::before{
+    content:"";position:absolute;left:0;right:0;bottom:13px;height:4px;
+    background-image:radial-gradient(circle,var(--bg) 2.5px,transparent 2.6px);
+    background-size:28px 4px;background-repeat:repeat-x;opacity:.9;
+  }
+  .rail-inner{max-width:980px;margin:0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .rail h1{margin:0;font-size:28px;font-weight:700;letter-spacing:.2px;}
+  .rail .tag{color:var(--copper);font-style:italic;font-weight:500;}
+  .rail .meta{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#cfc6b4;letter-spacing:.04em;}
+
+  main{max-width:980px;margin:0 auto;padding:26px 20px 80px;}
+
+  /* ---- Toolbar ---- */
+  .toolbar{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:26px;}
+  .toolbar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+  .toolbar-row:last-child{margin-bottom:0;}
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+  input[type=text], textarea, select{
+    font-family:'IBM Plex Sans',sans-serif;font-size:14px;padding:9px 10px;border:1px solid var(--line);
+    border-radius:var(--radius);background:#fff;color:var(--ink);
+  }
+  textarea{resize:vertical;}
+  input[type=text]:focus, textarea:focus, select:focus, button:focus{
+    outline:2px solid var(--copper);outline-offset:1px;
+  }
+  button{
+    font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:.01em;
+    padding:9px 16px;border-radius:var(--radius);border:1px solid var(--ink);background:var(--ink);color:var(--bg);
+    cursor:pointer;white-space:nowrap;
+  }
+  button:hover{background:#000;}
+  button.secondary{background:transparent;color:var(--ink);border-color:var(--line);}
+  button.secondary:hover{border-color:var(--ink);background:#fff;}
+  button.danger{background:transparent;color:var(--rust);border-color:var(--rust);}
+  button.danger:hover{background:var(--rust-bg);}
+  button:disabled{opacity:.5;cursor:wait;}
+  .file-btn{position:relative;overflow:hidden;}
+  .file-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .export-row{display:flex;gap:8px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:12px;margin-top:4px;}
+  .export-row span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);align-self:center;margin-right:4px;}
+  .status-line{font-size:12.5px;color:var(--copper-ink);font-family:'IBM Plex Mono',monospace;min-height:16px;margin-top:8px;}
+
+  /* ---- Board / empty state ---- */
+  .board{display:flex;flex-direction:column;gap:22px;}
+  .empty{
+    border:1px dashed var(--line);border-radius:var(--radius);padding:42px 24px;text-align:center;color:var(--muted);
+  }
+  .empty .display{font-size:20px;color:var(--ink);margin:0 0 6px;}
+  .empty p{margin:0;font-size:14px;}
+
+  /* ---- Ticket card (signature element) ---- */
+  .ticket{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    position:relative;padding-top:22px;
+  }
+  .ticket::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:14px;
+    background-image:radial-gradient(circle,var(--bg) 3px,transparent 3.1px);
+    background-size:18px 14px;background-position:9px 0;background-repeat:repeat-x;
+  }
+  .ticket-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:6px 18px 14px;border-bottom:1px solid var(--line);}
+  .ticket-num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--copper-ink);letter-spacing:.06em;margin-bottom:4px;}
+  .ticket-name{font-family:'Fraunces',serif;font-size:21px;font-weight:600;border:none;background:transparent;width:100%;padding:0;color:var(--ink);}
+  .ticket-name:focus{outline:none;border-bottom:1px solid var(--copper);}
+  .ticket-actions{display:flex;gap:8px;align-self:flex-start;}
+  .icon-btn{
+    border:1px solid var(--line);background:transparent;color:var(--muted);width:30px;height:30px;padding:0;
+    border-radius:var(--radius);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{border-color:var(--rust);color:var(--rust);background:var(--rust-bg);}
+
+  .ticket-body{padding:16px 18px 18px;}
+  .notes-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;}
+  .notes-row input{flex:1;}
+
+  .section-label{
+    font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    border-top:1px solid var(--line);padding-top:14px;margin-top:14px;margin-bottom:10px;
+  }
+  .ticket-body .section-label:first-child{border-top:none;padding-top:0;margin-top:0;}
+
+  .meta-grid{display:flex;gap:18px;margin-bottom:12px;flex-wrap:wrap;}
+  .meta-grid .field{flex:0 0 140px;}
+
+  table.ing-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+  table.ing-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:0 6px 6px;}
+  table.ing-table td{padding:3px 6px 3px 0;}
+  table.ing-table input{width:100%;}
+  table.ing-table td.col-qte{width:80px;}
+  table.ing-table td.col-unite{width:80px;}
+  table.ing-table td.col-rm{width:30px;}
+
+  .steps-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+  .step-row{display:flex;gap:8px;align-items:flex-start;}
+  .step-num{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--copper-ink);padding-top:9px;width:22px;flex-shrink:0;text-align:right;}
+  .step-row textarea{flex:1;min-height:38px;}
+
+  .add-line{background:transparent;border:1px dashed var(--line);color:var(--muted);font-weight:500;font-size:12.5px;padding:6px 12px;}
+  .add-line:hover{border-color:var(--copper);color:var(--copper-ink);background:transparent;}
+
+  .allergen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px;}
+  .stamp{
+    border:1.5px solid var(--line);border-radius:var(--radius);padding:8px 10px;font-size:12.5px;font-weight:500;
+    cursor:pointer;text-align:center;user-select:none;transition:background .1s,border-color .1s,color .1s;color:var(--muted);
+  }
+  .stamp.on{border-color:var(--rust);color:var(--rust);background:var(--rust-bg);}
+  .stamp.off{border-color:var(--sage);color:var(--sage);background:var(--sage-bg);opacity:.55;}
+  .allergen-note{width:100%;}
+
+  .ticket-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:12px 18px;flex-wrap:wrap;}
+  .ticket-foot .field{flex:0 0 200px;}
+  .ticket-foot .actions{display:flex;gap:8px;}
+
+  .loading-state, .error-state{padding:24px 18px;text-align:center;}
+  .loading-state .mono{color:var(--copper-ink);}
+  .error-state p{color:var(--rust);font-size:13.5px;margin:0 0 10px;}
+
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--copper);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---- Print view (used for PDF export) ---- */
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:0;}
+    .print-dish{padding:0 0 24px;page-break-after:always;}
+    .print-dish:last-child{page-break-after:auto;}
+    .print-dish h2{font-family:'Fraunces',serif;border-bottom:2px solid #000;padding-bottom:6px;}
+    .print-dish table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+    .print-dish th, .print-dish td{border:1px solid #999;padding:5px 7px;font-size:12px;text-align:left;}
+    .print-dish .allergen-tag-on{color:#9E3A2E;font-weight:700;}
+    .print-dish .allergen-tag-off{color:#999;}
+  }
+
+  @media (max-width:600px){
+    .rail{padding:22px 16px 30px;}
+    .rail h1{font-size:23px;}
+    .meta-grid .field{flex:1 1 45%;}
+  }
+</style>
+</head>
+<body>
+
+<header class="rail">
+  <div class="rail-inner">
+    <div>
+      <h1>FicheChef <span class="tag">— le rail de la brigade</span></h1>
+    </div>
+    <div class="meta">FICHES TECHNIQUES · 14 ALLERGÈNES UE · RÈGL. 1169/2011</div>
+  </div>
+</header>
+
+<main>
+
+  <section class="toolbar">
+    <div class="toolbar-row">
+      <div class="field" style="flex:2;min-width:220px;">
+        <label for="dishInput">Nom du plat</label>
+        <input type="text" id="dishInput" placeholder="ex. Velouté de potimarron, noisettes torréfiées">
+      </div>
+      <div class="field" style="flex:2;min-width:220px;">
+        <label for="notesInput">Précisions (facultatif)</label>
+        <input type="text" id="notesInput" placeholder="ex. version sans crème, garniture à part…">
+      </div>
+      <button id="addBtn">+ Ajouter un plat</button>
+    </div>
+    <div class="toolbar-row">
+      <button class="secondary file-btn">
+        Importer un menu (.txt / .csv)
+        <input type="file" id="menuFile" accept=".txt,.csv">
+      </button>
+      <button id="generateAllBtn" class="secondary">Générer toutes les fiches en attente</button>
+      <div style="flex:1"></div>
+    </div>
+    <div class="export-row">
+      <span>Exporter tout :</span>
+      <button class="secondary" id="exportExcelBtn">Excel (.xlsx)</button>
+      <button class="secondary" id="exportWordBtn">Word (.doc)</button>
+      <button class="secondary" id="exportPdfBtn">PDF (impression)</button>
+    </div>
+    <div class="status-line" id="statusLine"></div>
+  </section>
+
+  <section class="board" id="board"></section>
+
+</main>
+
+<div id="printArea"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  const ALLERGENS = [
+    {key:'gluten', label:'Gluten'},
+    {key:'crustaces', label:'Crustacés'},
+    {key:'oeufs', label:'Œufs'},
+    {key:'poissons', label:'Poissons'},
+    {key:'arachides', label:'Arachides'},
+    {key:'soja', label:'Soja'},
+    {key:'lait', label:'Lait'},
+    {key:'fruitsACoque', label:'Fruits à coque'},
+    {key:'celeri', label:'Céleri'},
+    {key:'moutarde', label:'Moutarde'},
+    {key:'sesame', label:'Sésame'},
+    {key:'sulfites', label:'Sulfites (SO₂)'},
+    {key:'lupin', label:'Lupin'},
+    {key:'mollusques', label:'Mollusques'},
+  ];
+
+  const board = document.getElementById('board');
+  const statusLine = document.getElementById('statusLine');
+
+  let dishes = [];
+  let ticketCounter = 0;
+
+  // ---------- DOM helper ----------
+  function el(tag, attrs, children){
+    const e = document.createElement(tag);
+    attrs = attrs || {};
+    for (const k in attrs){
+      const v = attrs[k];
+      if (v == null) continue;
+      if (k === 'class') e.className = v;
+      else if (k.indexOf('on') === 0 && typeof v === 'function') e.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') e.innerHTML = v;
+      else e.setAttribute(k, v);
+    }
+    (children || []).forEach(function(c){
+      if (c == null) return;
+      e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(c) : c);
+    });
+    return e;
+  }
+
+  function emptyData(){
+    const allergenes = {};
+    ALLERGENS.forEach(function(a){ allergenes[a.key] = false; });
+    return { portions:4, tempsPreparation:'', ingredients:[], etapes:[], allergenes:allergenes, noteAllergenes:'' };
+  }
+
+  function addDish(name, notes){
+    name = (name || '').trim();
+    if (!name) return;
+    ticketCounter += 1;
+    dishes.push({
+      id: 'd' + Date.now() + Math.random().toString(36).slice(2,6),
+      num: ticketCounter,
+      name: name,
+      notes: notes || '',
+      status: 'pending', // pending | loading | done | error
+      errorMsg: '',
+      exportMode: 'both', // fiche | allergenes | both
+      data: emptyData(),
+    });
+    render();
+  }
+
+  function removeDish(id){
+    dishes = dishes.filter(function(d){ return d.id !== id; });
+    render();
+  }
+
+  function findDish(id){
+    return dishes.filter(function(d){ return d.id === id; })[0];
+  }
+
+  // ---------- API call ----------
+  async function generateDish(id){
+    const dish = findDish(id);
+    if (!dish) return;
+    dish.status = 'loading';
+    dish.errorMsg = '';
+    render();
+    try {
+      const res = await fetch('/api/generate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ dishName: dish.name, notes: dish.notes }),
+      });
+      const json = await res.json().catch(function(){ return {}; });
+      if (!res.ok){
+        throw new Error(json.error || ('Erreur ' + res.status));
+      }
+      dish.data = {
+        portions: json.portions || 4,
+        tempsPreparation: json.tempsPreparation || '',
+        ingredients: Array.isArray(json.ingredients) ? json.ingredients : [],
+        etapes: Array.isArray(json.etapes) ? json.etapes : [],
+        allergenes: json.allergenes || emptyData().allergenes,
+        noteAllergenes: json.noteAllergenes || '',
+      };
+      dish.status = 'done';
+    } catch (err) {
+      dish.status = 'error';
+      dish.errorMsg = err.message || 'Le service de génération est inaccessible. Vérifiez que l’application est déployée sur Netlify avec la fonction configurée (OPENROUTER_API_KEY).';
+    }
+    render();
+  }
+
+  async function generateAll(){
+    const pending = dishes.filter(function(d){ return d.status === 'pending' || d.status === 'error'; });
+    if (!pending.length){ statusLine.textContent = 'Aucune fiche en attente.'; return; }
+    for (let i = 0; i < pending.length; i++){
+      statusLine.textContent = 'Génération ' + (i+1) + ' / ' + pending.length + ' — ' + pending[i].name + '…';
+      await generateDish(pending[i].id);
+    }
+    statusLine.textContent = 'Terminé : ' + pending.length + ' fiche(s) traitée(s).';
+  }
+
+  // ---------- Render ----------
+  function render(){
+    board.innerHTML = '';
+    if (!dishes.length){
+      board.appendChild(el('div', {class:'empty'}, [
+        el('p', {class:'display'}, ['Le rail est vide']),
+        el('p', {}, ['Ajoutez un plat ci-dessus, ou importez un menu, pour démarrer une fiche.']),
+      ]));
+      return;
+    }
+    dishes.forEach(function(dish){
+      board.appendChild(renderTicket(dish));
+    });
+  }
+
+  function renderTicket(dish){
+    const head = el('div', {class:'ticket-head'}, [
+      el('div', {style:'flex:1'}, [
+        el('div', {class:'ticket-num mono'}, ['N° ' + String(dish.num).padStart(3,'0')]),
+        el('input', {
+          type:'text', class:'ticket-name', value:dish.name,
+          oninput: function(e){ dish.name = e.target.value; },
+        }),
+      ]),
+      el('div', {class:'ticket-actions'}, [
+        el('button', {class:'icon-btn', title:'Supprimer ce plat', 'aria-label':'Supprimer', onclick: function(){ removeDish(dish.id); }}, ['×']),
+      ]),
+    ]);
+
+    const body = el('div', {class:'ticket-body'});
+
+    body.appendChild(el('div', {class:'notes-row'}, [
+      el('input', {
+        type:'text', placeholder:'Précisions pour l’IA (facultatif)…', value:dish.notes,
+        oninput: function(e){ dish.notes = e.target.value; },
+      }),
+      dish.status === 'done'
+        ? el('button', {class:'secondary', onclick: function(){ generateDish(dish.id); }}, ['↻ Régénérer'])
+        : el('button', {disabled: dish.status==='loading' ? '' : null, onclick: function(){ generateDish(dish.id); }}, [dish.status==='loading' ? 'Préparation…' : 'Générer la fiche']),
+    ]));
+
+    if (dish.status === 'loading'){
+      body.appendChild(el('div', {class:'loading-state'}, [
+        el('span', {class:'spinner'}),
+        el('span', {class:'mono'}, ['Le chef réfléchit…']),
+      ]));
+    } else if (dish.status === 'error'){
+      body.appendChild(el('div', {class:'error-state'}, [
+        el('p', {}, [dish.errorMsg || 'La génération a échoué.']),
+        el('button', {class:'secondary', onclick: function(){ generateDish(dish.id); }}, ['Réessayer']),
+      ]));
+    } else if (dish.status === 'done'){
+      body.appendChild(renderFicheSection(dish));
+      body.appendChild(renderAllergenSection(dish));
+    } else {
+      body.appendChild(el('div', {class:'loading-state'}, [
+        el('span', {class:'mono', style:'color:var(--muted)'}, ['En attente de génération.']),
+      ]));
+    }
+
+    const foot = el('div', {class:'ticket-foot'}, [
+      el('div', {class:'field'}, [
+        el('label', {}, ['Mode d’export pour ce plat']),
+        el('select', {
+          onchange: function(e){ dish.exportMode = e.target.value; },
+        }, [
+          el('option', {value:'both', selected: dish.exportMode==='both' ? '' : null}, ['Fiche + allergènes']),
+          el('option', {value:'fiche', selected: dish.exportMode==='fiche' ? '' : null}, ['Fiche seule']),
+          el('option', {value:'allergenes', selected: dish.exportMode==='allergenes' ? '' : null}, ['Allergènes seuls']),
+        ]),
+      ]),
+      el('div', {class:'actions'}, [
+        dish.status === 'done'
+          ? el('button', {class:'secondary', onclick: function(){ exportSingleWord(dish); }}, ['Exporter cette fiche (Word)'])
+          : null,
+      ]),
+    ]);
+
+    return el('div', {class:'ticket'}, [head, body, foot]);
+  }
+
+  function renderFicheSection(dish){
+    const wrap = el('div', {});
+    wrap.appendChild(el('div', {class:'section-label'}, ['Fiche technique']));
+
+    const metaGrid = el('div', {class:'meta-grid'}, [
+      el('div', {class:'field'}, [
+        el('label', {}, ['Portions']),
+        el('input', {type:'text', value:String(dish.data.portions), oninput: function(e){ dish.data.portions = e.target.value; }}),
+      ]),
+      el('div', {class:'field'}, [
+        el('label', {}, ['Temps de préparation']),
+        el('input', {type:'text', value:dish.data.tempsPreparation, oninput: function(e){ dish.data.tempsPreparation = e.target.value; }}),
+      ]),
+    ]);
+    wrap.appendChild(metaGrid);
+
+    // Ingredients table
+    const table = el('table', {class:'ing-table'}, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', {}, ['Ingrédient']), el('th', {}, ['Qté']), el('th', {}, ['Unité']), el('th', {}, ['']),
+      ])]),
+    ]);
+    const tbody = el('tbody');
+    dish.data.ingredients.forEach(function(ing, idx){
+      tbody.appendChild(el('tr', {}, [
+        el('td', {}, [el('input', {type:'text', value:ing.nom, oninput:function(e){ ing.nom = e.target.value; }})]),
+        el('td', {class:'col-qte'}, [el('input', {type:'text', value:ing.quantite, oninput:function(e){ ing.quantite = e.target.value; }})]),
+        el('td', {class:'col-unite'}, [el('input', {type:'text', value:ing.unite, oninput:function(e){ ing.unite = e.target.value; }})]),
+        el('td', {class:'col-rm'}, [el('button', {class:'icon-btn', onclick:function(){ dish.data.ingredients.splice(idx,1); render(); }}, ['×'])]),
+      ]));
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    wrap.appendChild(el('button', {class:'add-line', onclick:function(){ dish.data.ingredients.push({nom:'',quantite:'',unite:''}); render(); }}, ['+ Ajouter un ingrédient']));
+
+    // Steps
+    wrap.appendChild(el('div', {class:'section-label'}, ['Étapes de préparation']));
+    const stepsList = el('div', {class:'steps-list'});
+    dish.data.etapes.forEach(function(step, idx){
+      stepsList.appendChild(el('div', {class:'step-row'}, [
+        el('div', {class:'step-num mono'}, [(idx+1) + '.']),
+        el('textarea', {rows:'2', oninput:function(e){ dish.data.etapes[idx] = e.target.value; }}, [step]),
+        el('button', {class:'icon-btn', onclick:function(){ dish.data.etapes.splice(idx,1); render(); }}, ['×']),
+      ]));
+    });
+    wrap.appendChild(stepsList);
+    wrap.appendChild(el('button', {class:'add-line', onclick:function(){ dish.data.etapes.push(''); render(); }}, ['+ Ajouter une étape']));
+
+    return wrap;
+  }
+
+  function renderAllergenSection(dish){
+    const wrap = el('div', {});
+    wrap.appendChild(el('div', {class:'section-label'}, ['Allergènes — 14 substances réglementées (UE)']));
+    const grid = el('div', {class:'allergen-grid'});
+    ALLERGENS.forEach(function(a){
+      const isOn = !!dish.data.allergenes[a.key];
+      grid.appendChild(el('div', {
+        class:'stamp ' + (isOn ? 'on' : 'off'),
+        onclick: function(){ dish.data.allergenes[a.key] = !dish.data.allergenes[a.key]; render(); },
+        title:'Cliquer pour basculer présent / absent',
+      }, [a.label]));
+    });
+    wrap.appendChild(grid);
+    wrap.appendChild(el('input', {
+      type:'text', class:'allergen-note', placeholder:'Note (ex. traces possibles…)',
+      value: dish.data.noteAllergenes,
+      oninput: function(e){ dish.data.noteAllergenes = e.target.value; },
+    }));
+    return wrap;
+  }
+
+  // ---------- Add / import ----------
+  document.getElementById('addBtn').addEventListener('click', function(){
+    const nameInput = document.getElementById('dishInput');
+    const notesInput = document.getElementById('notesInput');
+    addDish(nameInput.value, notesInput.value);
+    nameInput.value = '';
+    notesInput.value = '';
+    nameInput.focus();
+  });
+  document.getElementById('dishInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ document.getElementById('addBtn').click(); }
+  });
+
+  document.getElementById('menuFile').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      const text = String(reader.result || '');
+      const lines = text.split(/\r?\n/);
+      let count = 0;
+      lines.forEach(function(line){
+        let name = line.split(',')[0]; // si CSV, on prend la 1ère colonne
+        name = name.replace(/^[\s\-\u2022\d.()]+/, ''); // retire puces / numéros en tête
+        name = name.replace(/[\d.,]+\s*€?\s*$/, '').trim(); // retire un prix en fin de ligne
+        if (name && name.length > 1){ addDish(name, ''); count += 1; }
+      });
+      statusLine.textContent = count + ' plat(s) importé(s) depuis le menu.';
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('generateAllBtn').addEventListener('click', generateAll);
+
+  // ---------- Exports ----------
+  function allergenList(dish){
+    return ALLERGENS.filter(function(a){ return dish.data.allergenes[a.key]; }).map(function(a){ return a.label; });
+  }
+
+  function exportExcel(){
+    const ficheRows = [['N° Ticket','Plat','Portions','Temps de préparation','Ingrédients','Étapes']];
+    const allergRows = [['N° Ticket','Plat'].concat(ALLERGENS.map(function(a){return a.label;})).concat(['Note'])];
+
+    dishes.forEach(function(d){
+      if (d.status !== 'done') return;
+      if (d.exportMode === 'fiche' || d.exportMode === 'both'){
+        ficheRows.push([
+          d.num, d.name, d.data.portions, d.data.tempsPreparation,
+          d.data.ingredients.map(function(i){ return i.nom + ' — ' + i.quantite + ' ' + i.unite; }).join('\n'),
+          d.data.etapes.map(function(s,i){ return (i+1)+'. '+s; }).join('\n'),
+        ]);
+      }
+      if (d.exportMode === 'allergenes' || d.exportMode === 'both'){
+        const row = [d.num, d.name];
+        ALLERGENS.forEach(function(a){ row.push(d.data.allergenes[a.key] ? 'X' : '–'); });
+        row.push(d.data.noteAllergenes);
+        allergRows.push(row);
+      }
+    });
+
+    if (ficheRows.length === 1 && allergRows.length === 1){
+      statusLine.textContent = 'Rien à exporter : générez au moins une fiche.';
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    if (ficheRows.length > 1){
+      const ws1 = XLSX.utils.aoa_to_sheet(ficheRows);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Fiches techniques');
+    }
+    if (allergRows.length > 1){
+      const ws2 = XLSX.utils.aoa_to_sheet(allergRows);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Allergènes UE');
+    }
+    XLSX.writeFile(wb, 'fichechef-export.xlsx');
+  }
+
+  function dishToHtmlSections(d){
+    let html = '';
+    const showFiche = d.exportMode === 'fiche' || d.exportMode === 'both';
+    const showAllerg = d.exportMode === 'allergenes' || d.exportMode === 'both';
+    html += '<h2>' + escapeHtml(d.name) + '</h2>';
+    if (showFiche){
+      html += '<p><b>Portions :</b> ' + escapeHtml(String(d.data.portions)) + ' &nbsp; <b>Temps :</b> ' + escapeHtml(d.data.tempsPreparation) + '</p>';
+      html += '<table><tr><th>Ingrédient</th><th>Quantité</th><th>Unité</th></tr>';
+      d.data.ingredients.forEach(function(i){
+        html += '<tr><td>'+escapeHtml(i.nom)+'</td><td>'+escapeHtml(i.quantite)+'</td><td>'+escapeHtml(i.unite)+'</td></tr>';
+      });
+      html += '</table>';
+      html += '<p><b>Étapes :</b></p><ol>';
+      d.data.etapes.forEach(function(s){ html += '<li>'+escapeHtml(s)+'</li>'; });
+      html += '</ol>';
+    }
+    if (showAllerg){
+      html += '<p><b>Allergènes (UE — 14 substances) :</b></p><table><tr><th>Allergène</th><th>Présence</th></tr>';
+      ALLERGENS.forEach(function(a){
+        const on = d.data.allergenes[a.key];
+        html += '<tr><td>'+a.label+'</td><td class="' + (on?'allergen-tag-on':'allergen-tag-off') + '">' + (on ? 'PRÉSENT' : 'Absent') + '</td></tr>';
+      });
+      html += '</table>';
+      if (d.data.noteAllergenes){ html += '<p><i>'+escapeHtml(d.data.noteAllergenes)+'</i></p>'; }
+    }
+    return html;
+  }
+
+  function escapeHtml(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function exportSingleWord(dish){
+    exportWordFromDishes([dish], 'fichechef-' + slug(dish.name) + '.doc');
+  }
+
+  function exportWordAll(){
+    const done = dishes.filter(function(d){ return d.status === 'done'; });
+    if (!done.length){ statusLine.textContent = 'Rien à exporter : générez au moins une fiche.'; return; }
+    exportWordFromDishes(done, 'fichechef-export.doc');
+  }
+
+  function exportWordFromDishes(list, filename){
+    let body = '';
+    list.forEach(function(d, idx){
+      body += '<div style="' + (idx>0 ? 'page-break-before:always;' : '') + '">' + dishToHtmlSections(d) + '</div>';
+    });
+    const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+      + '<head><meta charset="utf-8"><title>FicheChef</title><style>'
+      + 'body{font-family:Calibri,Arial,sans-serif;} table{border-collapse:collapse;width:100%;margin-bottom:10px;} '
+      + 'td,th{border:1px solid #999;padding:4px 8px;font-size:11pt;text-align:left;} '
+      + 'h2{border-bottom:2px solid #1B1814;padding-bottom:4px;} '
+      + '.allergen-tag-on{color:#9E3A2E;font-weight:bold;} .allergen-tag-off{color:#888;}'
+      + '</style></head><body>' + body + '</body></html>';
+
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    triggerDownload(blob, filename);
+  }
+
+  function exportPdf(){
+    const done = dishes.filter(function(d){ return d.status === 'done'; });
+    if (!done.length){ statusLine.textContent = 'Rien à exporter : générez au moins une fiche.'; return; }
+    const printArea = document.getElementById('printArea');
+    let html = '';
+    done.forEach(function(d){
+      html += '<div class="print-dish">' + dishToHtmlSections(d) + '</div>';
+    });
+    printArea.innerHTML = html;
+    window.print();
+  }
+
+  function triggerDownload(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+
+  function slug(s){
+    return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,40) || 'plat';
+  }
+
+  document.getElementById('exportExcelBtn').addEventListener('click', exportExcel);
+  document.getElementById('exportWordBtn').addEventListener('click', exportWordAll);
+  document.getElementById('exportPdfBtn').addEventListener('click', exportPdf);
+
+  render();
+})();
+</script>
+</body>
+</html>
